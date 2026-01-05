@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注意力训练</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft Yahei", sans-serif;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f0f2f5;
+            padding: 20px;
+        }
+
+        .container {
+            text-align: center;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4096ff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 5px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #3088ff;
+        }
+
+        button:disabled {
+            background-color: #a0cfff;
+            cursor: not-allowed;
+        }
+
+        .timer {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #666;
+        }
+
+        /* 新增下一个数字提示样式 */
+        .next-number {
+            font-size: 20px;
+            font-weight: bold;
+            color: #ff7a45;
+            margin-bottom: 20px;
+            padding: 8px 16px;
+            background-color: #fff7e6;
+            border-radius: 5px;
+            display: inline-block;
+        }
+
+        .schulte-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 60px);
+            grid-template-rows: repeat(5, 60px);
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .grid-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #e8f4ff;
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .grid-cell:hover {
+            background-color: #d1e7ff;
+        }
+
+        .instructions {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #888;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>注意力训练</h1>
+        
+        <div class="controls">
+            <button id="generateBtn">生成新表</button>
+            <button id="resetBtn" disabled>重置</button>
+        </div>
+        
+        <div class="timer">计时: <span id="timeDisplay">00:00.000</span></div>
+        
+        <!-- 新增下一个数字提示区域 -->
+        <div class="next-number">请点击数字：<span id="nextNumDisplay">1</span></div>
+        
+        <div class="schulte-grid" id="schulteGrid"></div>
+        
+        <div class="instructions">
+            操作说明：点击"生成新表"开始训练，按顺序点击提示的数字，完成后会显示用时。<br>
+            训练目标：锻炼注意力、视觉搜索能力和手眼协调能力。
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const generateBtn = document.getElementById('generateBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const schulteGrid = document.getElementById('schulteGrid');
+        // 新增下一个数字显示元素
+        const nextNumDisplay = document.getElementById('nextNumDisplay');
+
+        // 全局变量
+        let timer = null;       // 计时器
+        let startTime = 0;      // 开始时间
+        let elapsedTime = 0;    // 已用时间
+        let currentNumber = 1;  // 当前需要点击的数字
+        let isRunning = false;  // 是否正在计时
+
+        // 生成1-25的随机数组
+        function generateRandomNumbers() {
+            const numbers = Array.from({ length: 25 }, (_, i) => i + 1);
+            // 随机打乱数组（Fisher-Yates 洗牌算法）
+            for (let i = numbers.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+            }
+            return numbers;
+        }
+
+        // 渲染舒尔特表
+        function renderGrid() {
+            // 清空网格
+            schulteGrid.innerHTML = '';
+            const numbers = generateRandomNumbers();
+            
+            numbers.forEach(num => {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                cell.textContent = num;
+                cell.dataset.num = num;
+                
+                // 单元格点击事件
+                cell.addEventListener('click', handleCellClick);
+                schulteGrid.appendChild(cell);
+            });
+        }
+
+        // 处理单元格点击
+        function handleCellClick(e) {
+            const cell = e.target;
+            const clickedNum = parseInt(cell.dataset.num);
+            
+            // 如果还没开始计时，点击第一个数字（1）时开始计时
+            if (clickedNum === 1 && !isRunning) {
+                startTimer();
+            }
+            
+            // 点击正确的数字
+            if (clickedNum === currentNumber) {
+                currentNumber++;
+                // 更新下一个需要点击的数字提示
+                nextNumDisplay.textContent = currentNumber > 25 ? "完成" : currentNumber;
+                
+                // 完成所有数字点击
+                if (currentNumber > 25) {
+                    stopTimer();
+                    // 获取总用时（秒）并显示对应提示
+                    const totalSeconds = elapsedTime / 1000;
+                    const promptText = getResultPrompt(totalSeconds);
+                    alert(`${promptText} 你的用时：${timeDisplay.textContent}`);
+                    // 禁用生成按钮，启用重置按钮
+                    generateBtn.disabled = true;
+                    resetBtn.disabled = false;
+                }
+            } 
+            // 点击错误的数字
+            else if (clickedNum > currentNumber) {
+                // 无视觉反馈，仅不推进进度
+            }
+        }
+
+        // 根据用时获取对应的结算提示语
+        function getResultPrompt(seconds) {
+            if (seconds <= 5) {
+                return "🎉 彻底禁欲成仙！脑力爆表，撸管？不存在的，精力全转化成专注力，世界纪录保持者级别";
+            } else if (seconds <= 10) {
+                return "🌟完全戒撸多年，肾气充盈，注意力如激光，一发不撸，天下我有";
+            } else if (seconds <= 15) {
+                return "👍 严格节制，只偶尔解压，脑子清澈如水晶，专注力硬邦邦";
+            } else if (seconds <= 20) {
+                return "✅ 适度撸一撸，生活平衡，注意力稳健，不影响大事";
+            } else if (seconds <= 25) {
+                return "💪 周撸几发，稍有疲软，但还能集中，就是偶尔脑雾走神";
+            } else if (seconds <= 30) {
+                return "⏰ 天天撸一管，肾虚预警！注意力开始涣散，找数字像喝醉了";
+            } else if (seconds <= 35) {
+                return "天天撸，肾虚初现！注意力涣散，多巴胺耗尽，找数字都像在雾里看花";
+            } else {
+                return "撸管上瘾狂魔，脑子成浆糊！记忆力下降、精神疲乏，数字找半天，生活一团糟";
+            }
+        }
+
+        // 开始计时器
+        function startTimer() {
+            startTime = Date.now() - elapsedTime;
+            isRunning = true;
+            
+            timer = setInterval(() => {
+                elapsedTime = Date.now() - startTime;
+                updateTimeDisplay();
+            }, 10);
+        }
+
+        // 停止计时器
+        function stopTimer() {
+            clearInterval(timer);
+            isRunning = false;
+        }
+
+        // 更新时间显示
+        function updateTimeDisplay() {
+            const milliseconds = Math.floor((elapsedTime % 1000) / 10);
+            const seconds = Math.floor((elapsedTime / 1000) % 60);
+            const minutes = Math.floor(elapsedTime / (1000 * 60));
+            
+            // 格式化时间（补零）
+            const formattedMinutes = minutes.toString().padStart(2, '0');
+            const formattedSeconds = seconds.toString().padStart(2, '0');
+            const formattedMs = milliseconds.toString().padStart(2, '0');
+            
+            timeDisplay.textContent = `${formattedMinutes}:${formattedSeconds}.${formattedMs}`;
+        }
+
+        // 重置训练
+        function resetTraining() {
+            stopTimer();
+            elapsedTime = 0;
+            currentNumber = 1;
+            isRunning = false;
+            updateTimeDisplay();
+            // 重置下一个数字提示为1
+            nextNumDisplay.textContent = 1;
+            generateBtn.disabled = false;
+            resetBtn.disabled = true;
+            renderGrid();
+        }
+
+        // 绑定按钮事件
+        generateBtn.addEventListener('click', () => {
+            resetTraining();
+        });
+
+        resetBtn.addEventListener('click', resetTraining);
+
+        // 初始渲染
+        renderGrid();
+    </script>
+</body>
+</html>
